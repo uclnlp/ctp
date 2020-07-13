@@ -1,0 +1,16 @@
+# num_rows 5000
+# max_levels 2
+# min_child 3
+# max_child 3
+# abstracts 1
+# boundary True
+# output gen_m3
+# min_distractor_relations 8
+# relation_length 3
+# backward False
+# train_test_split 0.8
+# calc False
+# verbose False
+story,summary
+[Elisa] loves browsing [Twitter]. [Elisa] graduated from [Stanford] about some time ago. [Carlos] has a wife who is [Elisa]. [Dawn] strongly believes in [Democratic] political views. [Albert] has a daughter called [Dawn]. [Edmonton] is the place where [Albert] was born. [Elisa] has a son-in-law who is [Albert]. [Albert] loves to do [dancing]. [Carlos] loves to do [cooking]. [Carlos] was born in [Toronto]. [Carlos] is not that active on social media. [Elisa] votes for the [Republican] political party. [Albert] is very active on social media. [Albert] loves browsing [Twitter]. [Elisa] is into [cooking]. [Dawn] graduated from [UBC] about some time ago. [Dawn] is not that active on social media. [Albert] is an employee of [Apple]. [Elisa] is a native of [Edmonton]. [Carlos] is a proud alumni of [UofToronto]. [Dawn] is a native of [Edmonton]. [Dawn] is into [dancing]. [Albert] is a proud alumni of [MIT]. [Elisa] works at [DeepMind]. [Albert] once attended the [Democratic] convention. [Carlos] works at [Facebook]. [Dawn] is an employee of [Facebook]. [Albert] follows [hockey]. [Elisa] loves to play [hockey]. [Dawn] follows [hockey]. [Carlos] loves browsing [Facebook]. [Elisa] is very active on social media. [Carlos] votes for the [Republican] political party. [Dawn] spends a lot of time on [Twitter]. [Carlos] follows [cricket].,[Dawn] is [Carlos]'s granddaughter.
+[Ashley] spends a lot of time on [Facebook]. [Elisa] loves browsing [Twitter]. [Elisa] is the wife of [Carlos]. [Carlos] works at [Facebook]. [Carlos] was born in [Toronto]. [Wanda] is a proud alumni of [Oxford]. [Ashley] strongly believes in [Democratic] political views. [Elisa] graduated from [Stanford] about some time ago. [Elisa] is very active on social media. [Elisa] loves to play [hockey]. [Carlos] votes for the [Republican] political party. [Ashley] is not that active on social media. [Wanda] is a sister of [Ashley]. [Ashley] is into [soccer]. [Wanda] is very active on social media. [Wanda] follows [cricket]. [Carlos] loves browsing [Facebook]. [Carlos] follows [cricket]. [Wanda] works at [Apple]. [Elisa] is into [cooking]. [Ashley] graduated from [Stanford] about some time ago. [Elisa] works at [DeepMind]. [Elisa] is a native of [Edmonton]. [Wanda] is a native of [Toronto]. [Carlos] is not that active on social media. [Wanda] once attended the [Democratic] convention. [Elisa] votes for the [Republican] political party. [Ashley] loves to do [drawing]. [Carlos] is a proud alumni of [UofToronto]. [Carlos] loves to do [cooking]. [Wanda] loves to do [dancing]. [Ashley] is the granddaughter of [Elisa]. [Wanda] loves browsing [Twitter]. [Ashley] works at [Apple]. [Ashley] was born in [Edmonton].,[Wanda] is the granddaughter of [Carlos].

@@ -1,0 +1,16 @@
+# store relations_store.json
+# num_rows 5000
+# max_levels 3
+# min_child 3
+# max_child 3
+# abstracts 1
+# boundary True
+# output gen_m3
+# relations grand,in-laws,sibling
+# num_distractors 0
+# min_distractor_relations 8
+# max_relation_length 3
+# min_relation_length 3
+# train_test_split 0.8
+story,summary
+[Cassie] is [Gloria]'s daughter. [Gloria] is an employee of [Microsoft]. [Gloria] is an alumni of [UBC]. [Gloria] was born in [Vancouver]. [Gloria] is very active on social media. [Gloria] loves browsing [Twitter]. [Gloria] strongly believes in [Republican] political views. [Gloria] is into [drawing]. [Gloria] watches [soccer] a lot. [Microsoft] is where [Cassie] goes to work. [Cassie] is a proud alumni of [UCB]. [Cassie] was born in [Toronto]. [Cassie] is not that active on social media. [Cassie] loves browsing [Reddit]. [Cassie] votes for the [Republican] political party. [Cassie] is into [drawing]. [Cassie] follows [hockey]. [Barbara] is [Cassie]'s sister. [Barbara] works at [Facebook]. [Barbara] graduated from [UCB] about some time ago. [Toronto] is the place where [Barbara] was born. [Barbara] is very active on social media. [Barbara] loves browsing [Reddit]. [Barbara] votes for the [Democratic] political party. [Barbara] is into [dancing]. [Barbara] is into [hockey]. [Joan] is [Barbara]'s sister. [Joan] is an employee of [Samsung]. [Joan] graduated from [UofToronto] about some time ago. [Joan] was born in [Montreal]. [Joan] is very active on social media. [Joan] spends a lot of time on [Facebook]. [Joan] strongly believes in [Republican] political views. [Joan] is into [dancing]. [Joan] is into [cricket].,[Joan] is [Gloria]'s daughter.

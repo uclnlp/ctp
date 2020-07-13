@@ -1,0 +1,15 @@
+# num_rows 5000
+# max_levels 1
+# min_child 3
+# max_child 3
+# abstracts 1
+# boundary True
+# output gen_m3
+# min_distractor_relations 8
+# relation_length 1
+# backward False
+# train_test_split 0.8
+# calc False
+# verbose False
+story,summary
+[Vivian] votes for the [Republican] political party. [Tony] graduated from [Oxford] about some time ago. [Tony] loves browsing [Twitter]. [Vivian] was born in [Montreal]. [Vivian] graduated from [MIT] about some time ago. [Vivian] follows [soccer]. [Tony] is into [dancing]. [Tony] strongly believes in [Republican] political views. [Tony] has a wife who is [Vivian]. [Tony] is very active on social media. [Vivian] is into [drawing]. [Tony] is a native of [Toronto]. [Tony] is an employee of [Microsoft]. [Tony] watches [cricket] a lot. [Vivian] spends a lot of time on [Twitter]. [Vivian] works at [DeepMind]. [Vivian] is very active on social media.,[Tony] has a wife who is [Vivian].

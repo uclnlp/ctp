@@ -1,0 +1,24 @@
+# Wercker configuration file
+
+box: conda/miniconda3
+
+no-response-timeout: 600
+command-timeout: 600
+
+build:
+  steps:
+    - script:
+      name: install
+      code: |
+        sudo apt-get update
+        sudo apt-get -y install build-essential unzip libboost-all-dev libgsl0-dev libeigen3-dev libopenblas-dev apt-utils git
+        python -m pip install torch
+        # python -m pip install -r requirements.txt
+        python -m pip install faiss allennlp nltk parsimonious tabulate termcolor tqdm torch scikit-learn scipy PyYAML colorclass terminaltables sklearn nmslib pytest pytest-xdist pytest-forked
+        # conda install pytorch-cpu torchvision-cpu -c pytorch
+        # conda install -y -c pytorch faiss-cpu
+
+    - script:
+        name: Run unit tests
+        code: |
+          python -m pytest tests -v

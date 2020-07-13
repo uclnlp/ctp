@@ -1,0 +1,135 @@
+{
+  "child": {
+    "male" : [
+      "e_2 is a son of e_1",
+      "e_1 has a son called e_2",
+      "e_2 is e_1's son"
+    ],
+    "female": [
+      "e_2 is a daughter of e_1",
+      "e_1 has a daughter called e_2",
+      "e_2 is e_1's daughter"
+    ]
+  },
+  "child-rev": {
+    "male": [
+      "e_2 is the father of e_1",
+      "e_2 is e_1's father"
+    ],
+    "female": [
+      "e_2 is the mother of e_1",
+      "e_2 is e_1's mother"
+    ]
+  },
+  "SO" : {
+    "male": [
+      "e_2 is the husband of e_1",
+      "The husband of e_1 is e_2",
+      "e_2 is e_1's husband"
+    ],
+    "female": [
+      "e_2 is the wife of e_1",
+      "e_1 has a wife who is e_2",
+      "e_2 is e_1's wife"
+    ]
+  },
+  "sibling": {
+    "male": [
+      "e_2 is a brother of e_1",
+      "e_1 has a brother named e_2",
+      "e_2 is e_1's brother"
+    ],
+    "female": [
+      "e_2 is a sister of e_1",
+      "e_1 has a sister named e_2",
+      "e_2 is e_1's sister"
+    ]
+  },
+  "grand": {
+    "male": [
+      "e_2 is the grandson of e_1",
+      "e_1 has a grandson who is e_2",
+      "e_2 is e_1's grandson"
+    ],
+    "female": [
+      "e_2 is the granddaughter of e_1",
+      "e_1 has a granddaughter who is e_2",
+      "e_2 is e_1's granddaughter"
+    ]
+  },
+  "grand-rev":{
+    "male": [
+      "e_2 is the grandfather of e_1",
+      "e_2 is e_1's grandfather"
+    ],
+    "female": [
+      "e_2 is the grandmother of e_1",
+      "e_2 is e_1's grandmother"
+    ]
+  },
+  "in-laws": {
+    "male": [
+      "e_2 is the son-in-law of e_1",
+      "e_1 has a son-in-law who is e_2"
+    ],
+    "female": [
+      "e_2 is the daughter-in-law of e_1",
+      "e_1 has a daughter-in-law who is e_2"
+    ]
+  },
+  "in-laws-rev": {
+    "male": [
+      "e_2 is the father-in-law of e_1",
+      "e_2 is e_1's father-in-law"
+    ],
+    "female": [
+      "e_2 is the mother-in-law of e_1",
+      "e_2 is e_1's mother-in-law"
+    ]
+  },
+
+  "no-relation": {
+    "male": [
+      "e_1 has no-relation with e_2",
+      "e_2 has no-relation with e_1"
+    ],
+    "female": [
+      "e_1 has no-relation with e_2",
+      "e_2 has no-relation with e_1"
+    ]
+  },
+  "_relation_keywords" : ["son","daughter","father","mother","husband","wife","brother","sister","grandson","granddaughter","grandfather", "grandmother","son-in-law","daughter-in-law","father-in-law","mother-in-law"]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
