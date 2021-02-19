@@ -5,8 +5,8 @@ import numpy as np
 import torch
 from torch import nn
 
-from kbcr.kernels import GaussianKernel
-from kbcr.smart import NeuralKB
+from ctp.kernels import GaussianKernel
+from ctp.smart import NeuralKB
 
 import pytest
 

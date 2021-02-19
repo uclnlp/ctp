@@ -5,9 +5,9 @@ import numpy as np
 import torch
 from torch import nn
 
-from kbcr.models import ComplEx, Multi
-from kbcr.models.reasoning import SimpleHoppy
-from kbcr.reformulators import LinearReformulator, AttentiveReformulator
+from ctp.models import ComplEx, Multi
+from ctp.models.reasoning import SimpleHoppy
+from ctp.reformulators import LinearReformulator, AttentiveReformulator
 
 import pytest
 
@@ -22,7 +22,7 @@ def test_multi():
 
     rs = np.random.RandomState(0)
 
-    for _ in range(16):
+    for _ in range(8):
         for nb_hops in range(1, 6):
             for use_attention in [True, False]:
                 for pt in {'max', 'min', 'sum', 'mixture'}:
@@ -65,8 +65,8 @@ def test_multi():
                         scores_po = scores_po.cpu().numpy()
 
                         for i in range(xs.shape[0]):
-                            np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                            np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                            np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-3, atol=1e-3)
+                            np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-3, atol=1e-3)
 
 
 if __name__ == '__main__':

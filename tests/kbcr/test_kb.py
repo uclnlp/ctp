@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from kbcr.models.util.masking import generate_kb_mask
+from ctp.models.util.masking import generate_kb_mask
 
 import pytest
 

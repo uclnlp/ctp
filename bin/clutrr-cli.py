@@ -13,21 +13,20 @@ import torch
 from torch import nn, optim, Tensor
 import torch.nn.functional as F
 
-from kbcr.util import make_batches
-from kbcr.clutrr import Fact, Data, Instance, accuracy
+from ctp.util import make_batches
+from ctp.clutrr import Fact, Data, Instance, accuracy
 
-from kbcr.clutrr.models import NeuralKB
-from kbcr.clutrr.models import Hoppy
+from ctp.clutrr.models import BatchNeuralKB, BatchHoppy
 
-from kbcr.reformulators import BaseReformulator
-from kbcr.reformulators import StaticReformulator
-from kbcr.reformulators import LinearReformulator
-from kbcr.reformulators import AttentiveReformulator
-from kbcr.reformulators import MemoryReformulator
-from kbcr.reformulators import NTPReformulator
+from ctp.reformulators import BaseReformulator
+from ctp.reformulators import StaticReformulator
+from ctp.reformulators import LinearReformulator
+from ctp.reformulators import AttentiveReformulator
+from ctp.reformulators import MemoryReformulator
+from ctp.reformulators import NTPReformulator
 
-from kbcr.kernels import BaseKernel, GaussianKernel
-from kbcr.regularizers import N2, N3, Entropy
+from ctp.kernels import BaseKernel, GaussianKernel
+from ctp.regularizers import N2, N3, Entropy
 
 from typing import List, Tuple, Dict, Optional
 
@@ -49,28 +48,42 @@ def decode(vector: Tensor,
     return top_idx, top_score
 
 
-def show_rules(model: Hoppy,
+def show_rules(model: BatchHoppy,
                kernel: BaseKernel,
                relation_embeddings: nn.Embedding,
-               data: Data,
                relation_to_idx: Dict[str, int],
                device: Optional[torch.device] = None):
     idx_to_relation = {i: r for r, i in relation_to_idx.items()}
-    for p in data.predicate_lst:
-        r = data.predicate_to_relations[p][0]
-        indices = torch.from_numpy(np.array([relation_to_idx[r]], dtype=np.int64))
-        if device is not None:
-            indices = indices.to(device)
+
+    rel_idx_pair_lst = sorted(relation_to_idx.items(), key=lambda kv: kv[1])
+
+    for r, i in rel_idx_pair_lst:
+        indices = torch.tensor([i], dtype=torch.long, device=device)
+
         r_emb = relation_embeddings(indices)
-        for reformulator, _ in model.hops_lst:
-            hops = reformulator(r_emb)
-            p_hops = []
-            for hop in hops:
-                hop_idx, hop_score = decode(hop, kernel, relation_embeddings)
-                hop_r = idx_to_relation[hop_idx]
-                hop_p = data.relation_to_predicate[hop_r]
-                p_hops += [(hop_p, hop_score)]
-            print(p, ' ← ', ', '.join(f'({a} {b:.4f})' for a, b in p_hops))
+
+        hops_lst = [p for p in model.hops_lst]
+
+        for reformulator, _ in hops_lst:
+            def _to_pair(hop: Tensor) -> Tuple[str, float]:
+                idx, score = decode(hop, kernel, relation_embeddings)
+                rel = idx_to_relation[idx]
+                return rel, score
+
+            hop_tensor_lst = [hop for hop in reformulator(r_emb)]
+
+            r_hops = [_to_pair(hop) for hop in hop_tensor_lst]
+            print(r, ' ← ', ', '.join(f'({a} {b:.4f})' for a, b in r_hops))
+
+            if isinstance(model.model, BatchHoppy):
+                for _r_emb in hop_tensor_lst:
+                    _hops_lst = [p for p in model.model.hops_lst]
+
+                    for j, (_reformulator, _) in enumerate(_hops_lst):
+                        _hop_tensor_lst = [_hop for _hop in _reformulator(_r_emb)]
+                        _r_hops = [_to_pair(_hop) for _hop in _hop_tensor_lst]
+                        print(j, ' ← ', ', '.join(f'({_a} {_b:.4f})' for _a, _b in _r_hops))
+
     return
 
 
@@ -105,43 +118,31 @@ class Batcher:
 
 
 def encode_relation(facts: List[Fact],
-                    # relation_embeddings: nn.Embedding,
                     relation_embeddings: Tensor,
                     relation_to_idx: Dict[str, int],
                     device: Optional[torch.device] = None) -> Tensor:
     indices_np = np.array([relation_to_idx[r] for _, r, _ in facts], dtype=np.int64)
-    indices = torch.from_numpy(indices_np)
-    if device is not None:
-        indices = indices.to(device)
-    # res = relation_embeddings(indices)
+    indices = torch.tensor(indices_np, dtype=torch.long, device=device)
     res = F.embedding(indices, relation_embeddings)
     return res
 
 
 def encode_arguments(facts: List[Fact],
-                     # entity_embeddings: nn.Embedding,
                      entity_embeddings: Tensor,
                      entity_to_idx: Dict[str, int],
                      device: Optional[torch.device] = None) -> Tuple[Tensor, Tensor]:
     indices_np = np.array([[entity_to_idx[s], entity_to_idx[o]] for s, _, o in facts], dtype=np.int64)
-    indices = torch.from_numpy(indices_np)
-    if device is not None:
-        indices = indices.to(device)
-    # emb = entity_embeddings(indices)
+    indices = torch.tensor(indices_np, dtype=torch.long, device=device)
     emb = F.embedding(indices, entity_embeddings)
     return emb[:, 0, :], emb[:, 1, :]
 
 
 def encode_entities(facts: List[Fact],
-                    # entity_embeddings: nn.Embedding,
                     entity_embeddings: Tensor,
                     entity_to_idx: Dict[str, int],
                     device: Optional[torch.device]) -> Tensor:
     indices_lst = sorted({entity_to_idx[e] for s, r, o in facts for e in {s, o}})
-    indices = torch.from_numpy(np.array(indices_lst, dtype=np.int64))
-    if device is not None:
-        indices = indices.to(device)
-    # emb = nn.Embedding.from_pretrained(embeddings=entity_embeddings(indices), sparse=False, freeze=True)
+    indices = torch.tensor(indices_lst, dtype=torch.long, device=device)
     emb = F.embedding(indices, entity_embeddings)
     return emb
 
@@ -161,24 +162,31 @@ def main(argv):
     argparser.add_argument('--test-max-depth', action='store', type=int, default=None)
 
     argparser.add_argument('--hops', nargs='+', type=str, default=['2', '2', '1R'])
+    argparser.add_argument('--encoder', nargs='+', type=str, default=None)
 
     # training params
     argparser.add_argument('--epochs', '-e', action='store', type=int, default=100)
     argparser.add_argument('--learning-rate', '-l', action='store', type=float, default=0.1)
     argparser.add_argument('--batch-size', '-b', action='store', type=int, default=8)
+    argparser.add_argument('--test-batch-size', '--tb', action='store', type=int, default=None)
+
     argparser.add_argument('--optimizer', '-o', action='store', type=str, default='adagrad',
                            choices=['adagrad', 'adam', 'sgd'])
 
     argparser.add_argument('--seed', action='store', type=int, default=0)
 
-    argparser.add_argument('--evaluate-every', '-V', action='store', type=int, default=32)
+    argparser.add_argument('--evaluate-every', '-V', action='store', type=int, default=1)
+    argparser.add_argument('--evaluate-every-batches', action='store', type=int, default=None)
 
     argparser.add_argument('--N2', action='store', type=float, default=None)
     argparser.add_argument('--N3', action='store', type=float, default=None)
     argparser.add_argument('--entropy', '-E', action='store', type=float, default=None)
 
-    argparser.add_argument('--scoring-type', '-s', action='store', type=str, default='min', choices=['concat', 'min'])
-    argparser.add_argument('--tnorm', '-t', action='store', type=str, default='min', choices=['min', 'prod'])
+    argparser.add_argument('--scoring-type', '-s', action='store', type=str, default='concat',
+                           choices=['concat', 'min'])
+
+    argparser.add_argument('--tnorm', '-t', action='store', type=str, default='min',
+                           choices=['min', 'prod', 'mean'])
     argparser.add_argument('--reformulator', '-r', action='store', type=str, default='linear',
                            choices=['static', 'linear', 'attentive', 'memory', 'ntp'])
     argparser.add_argument('--nb-rules', '-R', action='store', type=int, default=4)
@@ -191,10 +199,15 @@ def main(argv):
     argparser.add_argument('--init', action='store', type=str, default='uniform')
     argparser.add_argument('--ref-init', action='store', type=str, default='random')
 
+    argparser.add_argument('--fix-relations', '--FR', action='store_true', default=False)
+    argparser.add_argument('--start-simple', action='store', type=int, default=None)
+
     argparser.add_argument('--debug', '-D', action='store_true', default=False)
 
     argparser.add_argument('--load', action='store', type=str, default=None)
     argparser.add_argument('--save', action='store', type=str, default=None)
+
+    argparser.add_argument('--predicate', action='store_true', default=False)
 
     args = argparser.parse_args(argv)
 
@@ -208,15 +221,19 @@ def main(argv):
     test_max_depth = args.test_max_depth
 
     hops_str = args.hops
+    encoder_str = args.encoder
 
     nb_epochs = args.epochs
     learning_rate = args.learning_rate
     batch_size = args.batch_size
+    test_batch_size = batch_size if args.test_batch_size is None else args.test_batch_size
+
     optimizer_name = args.optimizer
 
     seed = args.seed
 
     evaluate_every = args.evaluate_every
+    evaluate_every_batches = args.evaluate_every_batches
 
     N2_weight = args.N2
     N3_weight = args.N3
@@ -235,10 +252,15 @@ def main(argv):
     init_type = args.init
     ref_init_type = args.ref_init
 
+    is_fixed_relations = args.fix_relations
+    start_simple = args.start_simple
+
     is_debug = args.debug
 
     load_path = args.load
     save_path = args.save
+
+    is_predicate = args.predicate
 
     np.random.seed(seed)
     random_state = np.random.RandomState(seed)
@@ -251,33 +273,44 @@ def main(argv):
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
     data = Data(train_path=train_path, test_paths=test_paths)
+    entity_lst, relation_lst = data.entity_lst, data.relation_lst
+    predicate_lst = data.predicate_lst
 
     relation_to_predicate = data.relation_to_predicate
-    predicate_to_relations = data.predicate_to_relations
-    entity_lst, predicate_lst, relation_lst = data.entity_lst, data.predicate_lst, data.relation_lst
 
-    nb_examples = len(data.train)
+    test_relation_lst = ["aunt", "brother", "daughter", "daughter-in-law", "father", "father-in-law", "granddaughter",
+                         "grandfather", "grandmother", "grandson", "mother", "mother-in-law", "nephew", "niece",
+                         "sister", "son", "son-in-law", "uncle"]
+
+    test_predicate_lst = sorted({relation_to_predicate[r] for r in test_relation_lst})
+
     nb_entities = len(entity_lst)
     nb_relations = len(relation_lst)
+    nb_predicates = len(predicate_lst)
 
     entity_to_idx = {e: i for i, e in enumerate(entity_lst)}
     relation_to_idx = {r: i for i, r in enumerate(relation_lst)}
+    predicate_to_idx = {p: i for i, p in enumerate(predicate_lst)}
 
     kernel = GaussianKernel(slope=slope)
 
-    entity_embeddings = nn.Embedding(nb_entities, embedding_size, sparse=False).to(device)
+    entity_embeddings = nn.Embedding(nb_entities, embedding_size, sparse=True).to(device)
     nn.init.uniform_(entity_embeddings.weight, -1.0, 1.0)
     entity_embeddings.requires_grad = False
 
-    relation_embeddings = nn.Embedding(nb_relations, embedding_size, sparse=False).to(device)
+    relation_embeddings = nn.Embedding(nb_relations if not is_predicate else nb_predicates,
+                                       embedding_size, sparse=True).to(device)
+
+    if is_fixed_relations is True:
+        relation_embeddings.requires_grad = False
 
     if init_type in {'uniform'}:
         nn.init.uniform_(relation_embeddings.weight, -1.0, 1.0)
 
     relation_embeddings.weight.data *= init_size
 
-    model = NeuralKB(kernel=kernel, scoring_type=scoring_type).to(device)
-    memory = None
+    model = BatchNeuralKB(kernel=kernel, scoring_type=scoring_type).to(device)
+    memory: Dict[int, MemoryReformulator.Memory] = {}
 
     def make_hop(s: str) -> Tuple[BaseReformulator, bool]:
         nonlocal memory
@@ -286,6 +319,7 @@ def main(argv):
         else:
             nb_hops, is_reversed = int(s[:-1]), True
         res = None
+
         if reformulator_name in {'static'}:
             res = StaticReformulator(nb_hops, embedding_size, init_name=ref_init_type)
         elif reformulator_name in {'linear'}:
@@ -293,46 +327,144 @@ def main(argv):
         elif reformulator_name in {'attentive'}:
             res = AttentiveReformulator(nb_hops, relation_embeddings, init_name=ref_init_type)
         elif reformulator_name in {'memory'}:
-            if memory is None:
-                memory = MemoryReformulator.Memory(nb_hops, nb_rules, embedding_size, init_name=ref_init_type)
-            res = MemoryReformulator(memory)
+            if nb_hops not in memory:
+                memory[nb_hops] = MemoryReformulator.Memory(nb_hops, nb_rules, embedding_size, init_name=ref_init_type)
+            res = MemoryReformulator(memory[nb_hops])
         elif reformulator_name in {'ntp'}:
             res = NTPReformulator(nb_hops=nb_hops, embedding_size=embedding_size,
                                   kernel=kernel, init_name=ref_init_type)
         assert res is not None
-        return res, is_reversed
+        return res.to(device), is_reversed
 
     hops_lst = [make_hop(s) for s in hops_str]
-    hoppy = Hoppy(model=model, k=k_max, depth=max_depth, tnorm_name=tnorm_name, hops_lst=hops_lst, R=gntp_R).to(device)
 
-    def scoring_function(story: List[Fact],
-                         targets: List[Fact]) -> Tensor:
-        story_rel = encode_relation(story, relation_embeddings.weight, relation_to_idx, device)
-        story_arg1, story_arg2 = encode_arguments(story, entity_embeddings.weight, entity_to_idx, device)
+    encoder_model = model
+    if encoder_str is not None:
+        encoder_lst = [make_hop(s) for s in encoder_str]
+        encoder_model = BatchHoppy(model=model, k=k_max, depth=1, tnorm_name=tnorm_name,
+                                   hops_lst=encoder_lst, R=gntp_R).to(device)
 
-        targets_rel = encode_relation(targets, relation_embeddings.weight, relation_to_idx, device)
-        targets_arg1, targets_arg2 = encode_arguments(targets, entity_embeddings.weight, entity_to_idx, device)
+    hoppy = BatchHoppy(model=encoder_model, k=k_max, depth=max_depth, tnorm_name=tnorm_name,
+                       hops_lst=hops_lst, R=gntp_R).to(device)
 
-        embeddings = encode_entities(story, entity_embeddings.weight, entity_to_idx, device)
+    def scoring_function(instances_batch: List[Instance],
+                         relation_lst: List[str],
+                         is_train: bool = False,
+                         _depth: Optional[int] = None) -> Tuple[Tensor, List[Tensor]]:
 
+        rel_emb_lst: List[Tensor] = []
+        arg1_emb_lst: List[Tensor] = []
+        arg2_emb_lst: List[Tensor] = []
+
+        story_rel_lst: List[Tensor] = []
+        story_arg1_lst: List[Tensor] = []
+        story_arg2_lst: List[Tensor] = []
+
+        embeddings_lst: List[Tensor] = []
+
+        label_lst: List[int] = []
+
+        for i, instance in enumerate(instances_batch):
+
+            if is_predicate is True:
+                def _convert_fact(fact: Fact) -> Fact:
+                    _s, _r, _o = fact
+                    return _s, relation_to_predicate[_r], _o
+
+                new_story = [_convert_fact(f) for f in instance.story]
+                new_target = _convert_fact(instance.target)
+                instance = Instance(new_story, new_target, instance.nb_nodes)
+
+            story, target = instance.story, instance.target
+            s, r, o = target
+
+            story_rel = encode_relation(story, relation_embeddings.weight,
+                                        predicate_to_idx if is_predicate else relation_to_idx, device)
+            story_arg1, story_arg2 = encode_arguments(story, entity_embeddings.weight, entity_to_idx, device)
+
+            embeddings = encode_entities(story, entity_embeddings.weight, entity_to_idx, device)
+
+            target_lst: List[Tuple[str, str, str]] = [(s, x, o) for x in relation_lst]
+
+            assert len(target_lst) == len(test_predicate_lst if is_predicate else test_relation_lst)
+
+            # true_predicate = rel_to_predicate[r]
+            # label_lst += [int(true_predicate == rel_to_predicate[r]) for r in relation_lst]
+
+            label_lst += [int(tr == r) for tr in relation_lst]
+
+            rel_emb = encode_relation(target_lst, relation_embeddings.weight,
+                                      predicate_to_idx if is_predicate else relation_to_idx, device)
+            arg1_emb, arg2_emb = encode_arguments(target_lst, entity_embeddings.weight, entity_to_idx, device)
+
+            batch_size = rel_emb.shape[0]
+            fact_size = story_rel.shape[0]
+            entity_size = embeddings.shape[0]
+
+            # [B, E]
+            rel_emb_lst += [rel_emb]
+            arg1_emb_lst += [arg1_emb]
+            arg2_emb_lst += [arg2_emb]
+
+            # [B, F, E]
+            story_rel_lst += [story_rel.view(1, fact_size, -1).repeat(batch_size, 1, 1)]
+            story_arg1_lst += [story_arg1.view(1, fact_size, -1).repeat(batch_size, 1, 1)]
+            story_arg2_lst += [story_arg2.view(1, fact_size, -1).repeat(batch_size, 1, 1)]
+
+            # [B, N, E]
+            embeddings_lst += [embeddings.view(1, entity_size, -1).repeat(batch_size, 1, 1)]
+
+        def cat_pad(t_lst: List[Tensor]) -> Tuple[Tensor, Tensor]:
+            lengths: List[int] = [t.shape[1] for t in t_lst]
+            max_len: int = max(lengths)
+
+            def my_pad(_t: Tensor, pad: List[int]) -> Tensor:
+                return torch.transpose(F.pad(torch.transpose(_t, 1, 2), pad=pad), 1, 2)
+
+            res_t: Tensor = torch.cat([my_pad(t, pad=[0, max_len - lengths[i]]) for i, t in enumerate(t_lst)], dim=0)
+            res_l: Tensor = torch.tensor([t.shape[1] for t in t_lst for _ in range(t.shape[0])],
+                                         dtype=torch.long, device=device)
+            return res_t, res_l
+
+        rel_emb = torch.cat(rel_emb_lst, dim=0)
+        arg1_emb = torch.cat(arg1_emb_lst, dim=0)
+        arg2_emb = torch.cat(arg2_emb_lst, dim=0)
+
+        story_rel, nb_facts = cat_pad(story_rel_lst)
+        story_arg1, _ = cat_pad(story_arg1_lst)
+        story_arg2, _ = cat_pad(story_arg2_lst)
         facts = [story_rel, story_arg1, story_arg2]
 
+        _embeddings, nb_embeddings = cat_pad(embeddings_lst)
+
         max_depth_ = hoppy.depth
-        if test_max_depth is not None:
+        if not is_train and test_max_depth is not None:
             hoppy.depth = test_max_depth
 
-        scores = hoppy.score(targets_rel, targets_arg1, targets_arg2, facts, embeddings)
+        if _depth is not None:
+            hoppy.depth = _depth
 
-        if test_max_depth is not None:
+        scores = hoppy.score(rel_emb, arg1_emb, arg2_emb, facts, nb_facts, _embeddings, nb_embeddings)
+
+        if not is_train and test_max_depth is not None:
             hoppy.depth = max_depth_
 
-        return scores
+        if _depth is not None:
+            hoppy.depth = max_depth_
 
-    def evaluate(instances: List[Instance], path: str, sample_size: Optional[int] = None) -> float:
+        return scores, [rel_emb, arg1_emb, arg2_emb]
+
+    def evaluate(instances: List[Instance],
+                 path: str,
+                 sample_size: Optional[int] = None) -> float:
         res = 0.0
         if len(instances) > 0:
-            res = accuracy(scoring_function=scoring_function, instances=instances, sample_size=sample_size,
-                           relation_to_predicate=relation_to_predicate, predicate_to_relations=predicate_to_relations)
+            res = accuracy(scoring_function=scoring_function,
+                           instances=instances,
+                           sample_size=sample_size,
+                           relation_lst=test_predicate_lst if is_predicate else test_relation_lst,
+                           batch_size=test_batch_size,
+                           relation_to_predicate=relation_to_predicate if is_predicate else None)
             logger.info(f'Test Accuracy on {path}: {res:.6f}')
         return res
 
@@ -344,7 +476,9 @@ def main(argv):
     entropy_reg = Entropy(use_logits=False) if entropy_weight is not None else None
 
     params_lst = [p for p in hoppy.parameters() if not torch.equal(p, entity_embeddings.weight)]
-    params_lst += relation_embeddings.parameters()
+
+    if is_fixed_relations is False:
+        params_lst += relation_embeddings.parameters()
 
     params = nn.ParameterList(params_lst).to(device)
 
@@ -366,7 +500,14 @@ def main(argv):
     global_step = 0
 
     for epoch_no in range(1, nb_epochs + 1):
-        batcher = Batcher(batch_size=batch_size, nb_examples=nb_examples, nb_epochs=1, random_state=random_state)
+
+        training_set, is_simple = data.train, False
+        if start_simple is not None and epoch_no <= start_simple:
+            training_set = [ins for ins in training_set if len(ins.story) == 2]
+            is_simple = True
+            logger.info(f'{len(data.train)} → {len(training_set)}')
+
+        batcher = Batcher(batch_size=batch_size, nb_examples=len(training_set), nb_epochs=1, random_state=random_state)
 
         nb_batches = len(batcher.batches)
         epoch_loss_values = []
@@ -375,76 +516,59 @@ def main(argv):
             global_step += 1
 
             indices_batch = batcher.get_batch(batch_start, batch_end)
-            instances_batch = [data.train[i] for i in indices_batch]
+            instances_batch = [training_set[i] for i in indices_batch]
 
-            batch_loss_values = []
+            if is_predicate is True:
+                label_lst: List[int] = [int(relation_to_predicate[ins.target[1]] == tp)
+                                        for ins in instances_batch
+                                        for tp in test_predicate_lst]
+            else:
+                label_lst: List[int] = [int(ins.target[1] == tr) for ins in instances_batch for tr in test_relation_lst]
 
-            for i, instance in enumerate(instances_batch):
-                story, target = instance.story, instance.target
-                s, r, o = target
+            labels = torch.tensor(label_lst, dtype=torch.float32, device=device)
 
-                # if is_debug is True and i == 0:
-                #     with torch.no_grad():
-                #         show_rules(model=hoppy, kernel=kernel, relation_embeddings=relation_embeddings,
-                #                    data=data, relation_to_idx=relation_to_idx, device=device)
+            scores, query_emb_lst = scoring_function(instances_batch,
+                                                     test_predicate_lst if is_predicate else test_relation_lst,
+                                                     is_train=True,
+                                                     _depth=1 if is_simple else None)
 
-                story_rel = encode_relation(story, relation_embeddings.weight, relation_to_idx, device)
-                story_arg1, story_arg2 = encode_arguments(story, entity_embeddings.weight, entity_to_idx, device)
+            loss = loss_function(scores, labels)
 
-                embeddings = encode_entities(story, entity_embeddings.weight, entity_to_idx, device)
-                facts = [story_rel, story_arg1, story_arg2]
+            factors = [hoppy.factor(e) for e in query_emb_lst]
 
-                # print('E', embeddings.weight.shape, 'S', story_rel.shape)
+            loss += N2_weight * N2_reg(factors) if N2_weight is not None else 0.0
+            loss += N3_weight * N3_reg(factors) if N3_weight is not None else 0.0
 
-                pos_predicate = relation_to_predicate[r]
-                p_relation_lst = sorted(relation_to_predicate.keys())
+            if entropy_weight is not None:
+                for hop, _ in hops_lst:
+                    attn_logits = hop.projection(query_emb_lst[0])
+                    attention = torch.softmax(attn_logits, dim=1)
+                    loss += entropy_weight * entropy_reg([attention])
 
-                target_lst = [(s, x, o) for x in p_relation_lst]
-                label_lst = [int(pos_predicate == relation_to_predicate[r]) for r in p_relation_lst]
+            loss_value = loss.item()
 
-                rel_emb = encode_relation(target_lst, relation_embeddings.weight, relation_to_idx, device)
-                arg1_emb, arg2_emb = encode_arguments(target_lst, entity_embeddings.weight, entity_to_idx, device)
+            epoch_loss_values += [loss_value]
 
-                scores = hoppy.score(rel_emb, arg1_emb, arg2_emb, facts, embeddings)
-                labels = torch.tensor(label_lst, dtype=torch.float32).to(device)
-
-                loss = loss_function(scores, labels)
-
-                factors = [hoppy.factor(e) for e in [rel_emb, arg1_emb, arg2_emb]]
-
-                loss += N2_weight * N2_reg(factors) if N2_weight is not None else 0.0
-                loss += N3_weight * N3_reg(factors) if N3_weight is not None else 0.0
-
-                if entropy_weight is not None:
-                    # attention = relation_embeddings.attention
-
-                    for hop, _ in hops_lst:
-                        attn_logits = hop.projection(rel_emb)
-                        attention = torch.softmax(attn_logits, dim=1)
-                        loss += entropy_weight * entropy_reg([attention])
-
-                loss_value = loss.item()
-
-                batch_loss_values += [loss_value]
-                epoch_loss_values += [loss_value]
-
-                loss.backward()
+            loss.backward()
 
             optimizer.step()
             optimizer.zero_grad()
 
-            loss_mean, loss_std = np.mean(batch_loss_values), np.std(batch_loss_values)
-            logger.info(f'Epoch {epoch_no}/{nb_epochs}\tBatch {batch_no}/{nb_batches}\tLoss {loss_mean:.4f} ± {loss_std:.4f}')
+            logger.info(f'Epoch {epoch_no}/{nb_epochs}\tBatch {batch_no}/{nb_batches}\tLoss {loss_value:.4f}')
 
-            if global_step % evaluate_every == 0:
-                for test_path in test_paths:
-                    instances = data.test[test_path]
-                    evaluate(instances=instances, path=test_path)
+            if evaluate_every_batches is not None:
+                if global_step % evaluate_every_batches == 0:
+                    for test_path in test_paths:
+                        evaluate(instances=data.test[test_path], path=test_path)
 
-                if is_debug is True:
-                    with torch.no_grad():
-                        show_rules(model=hoppy, kernel=kernel, relation_embeddings=relation_embeddings,
-                                   data=data, relation_to_idx=relation_to_idx, device=device)
+        if epoch_no % evaluate_every == 0:
+            for test_path in test_paths:
+                evaluate(instances=data.test[test_path], path=test_path)
+
+            if is_debug is True:
+                with torch.no_grad():
+                    show_rules(model=hoppy, kernel=kernel, relation_embeddings=relation_embeddings,
+                               relation_to_idx=predicate_to_idx if is_predicate else relation_to_idx, device=device)
 
         loss_mean, loss_std = np.mean(epoch_loss_values), np.std(epoch_loss_values)
 

@@ -5,10 +5,10 @@ import numpy as np
 import torch
 from torch import nn
 
-from kbcr.kernels import GaussianKernel
-from kbcr.models import DistMult, ComplEx, NeuralKB
-from kbcr.models.reasoning import SimpleHoppy, RecursiveHoppy, Hoppy
-from kbcr.reformulators import LinearReformulator, AttentiveReformulator
+from ctp.kernels import GaussianKernel
+from ctp.models import DistMult, ComplEx, NeuralKB
+from ctp.models.reasoning import SimpleHoppy, RecursiveHoppy, Hoppy
+from ctp.reformulators import LinearReformulator, AttentiveReformulator
 
 import pytest
 
@@ -51,8 +51,8 @@ def test_distmult_v1():
             scores_po = scores_po.cpu().numpy()
 
             for i in range(xs.shape[0]):
-                np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-3, atol=1e-3)
+                np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-3, atol=1e-3)
 
 
 @pytest.mark.light
@@ -93,8 +93,8 @@ def test_complex_v1():
             scores_po = scores_po.cpu().numpy()
 
             for i in range(xs.shape[0]):
-                np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-3, atol=1e-3)
+                np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-3, atol=1e-3)
 
 
 @pytest.mark.light
@@ -160,8 +160,8 @@ def test_neuralkb_v1():
                 scores_po = scores_po.cpu().numpy()
 
                 for i in range(xs.shape[0]):
-                    np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                    np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                    np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-2, atol=1e-2)
+                    np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-2, atol=1e-2)
 
 
 @pytest.mark.light
@@ -206,8 +206,8 @@ def test_hoppy_v1():
                     scores_po = scores_po.cpu().numpy()
 
                     for i in range(xs.shape[0]):
-                        np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                        np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                        np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-3, atol=1e-3)
+                        np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-3, atol=1e-3)
 
 
 @pytest.mark.light
@@ -256,8 +256,8 @@ def test_rhoppy_v1():
                         scores_po = scores_po.cpu().numpy()
 
                         for i in range(xs.shape[0]):
-                            np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                            np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                            np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-3, atol=1e-3)
+                            np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-3, atol=1e-3)
 
 
 @pytest.mark.light
@@ -314,8 +314,8 @@ def test_multirhoppy_v1():
                         scores_po = scores_po.cpu().numpy()
 
                         for i in range(xs.shape[0]):
-                            np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                            np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                            np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-3, atol=1e-3)
+                            np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-3, atol=1e-3)
 
 
 if __name__ == '__main__':

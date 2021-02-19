@@ -5,14 +5,14 @@ import numpy as np
 import torch
 from torch import nn, optim
 
-from kbcr.kernels import GaussianKernel
-from kbcr.models import NeuralKB
-from kbcr.regularizers import N3
+from ctp.kernels import GaussianKernel
+from ctp.models import NeuralKB
+from ctp.regularizers import N3
 
-from kbcr.models.reasoning import SimpleHoppy
-from kbcr.reformulators import AttentiveReformulator
+from ctp.models.reasoning import SimpleHoppy
+from ctp.reformulators import AttentiveReformulator
 
-from kbcr.util import make_batches
+from ctp.util import make_batches
 
 import pytest
 

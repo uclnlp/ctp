@@ -8,12 +8,12 @@ from itertools import cycle, islice
 import torch
 from torch import nn, optim, Tensor
 
-from kbcr.kernels import GaussianKernel
-from kbcr.clutrr.models import NeuralKB, Hoppy
-from kbcr.reformulators import AttentiveReformulator
-from kbcr.reformulators import SymbolicReformulator
+from ctp.kernels import GaussianKernel
+from ctp.clutrr.models import BatchNeuralKB, BatchHoppy
+from ctp.reformulators import AttentiveReformulator
+from ctp.reformulators import SymbolicReformulator
 
-from kbcr.util import make_batches
+from ctp.util import make_batches
 
 from typing import List, Dict, Tuple, Optional
 
@@ -67,7 +67,7 @@ def test_clutrr_v1():
     predicate_embeddings = nn.Embedding(nb_predicates, embedding_size, sparse=True)
 
     for scoring_type in ['concat']:  # ['min', 'concat']:
-        model = NeuralKB(kernel=kernel, scoring_type=scoring_type)
+        model = BatchNeuralKB(kernel=kernel, scoring_type=scoring_type)
 
         for s in entity_lst:
             for p in predicate_lst:
@@ -90,9 +90,18 @@ def test_clutrr_v1():
                         arg1_emb, arg2_emb = encode_arguments(facts=triples, entity_embeddings=entity_embeddings,
                                                               entity_to_idx=entity_to_index)
 
+                        batch_size = xp.shape[0]
+                        fact_size = rel_emb.shape[0]
+
+                        rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+                        arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+                        arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+
+                        nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
                         facts = [rel_emb, arg1_emb, arg2_emb]
 
-                        inf = model.score(xp_emb, xs_emb, xo_emb, facts=facts)
+                        inf = model.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts)
                         inf_np = inf.cpu().numpy()
 
                         assert inf_np[0] > 0.95 if (s, p, o) in triples else inf_np[0] < 0.01
@@ -124,11 +133,11 @@ def test_clutrr_v2():
     predicate_embeddings = nn.Embedding(nb_predicates, embedding_size, sparse=True)
 
     for scoring_type in ['concat']:  # ['min', 'concat']:
-        model = NeuralKB(kernel=kernel, scoring_type=scoring_type)
+        model = BatchNeuralKB(kernel=kernel, scoring_type=scoring_type)
 
         indices = torch.from_numpy(np.array([predicate_to_index['p'], predicate_to_index['q']]))
         _hops = SymbolicReformulator(predicate_embeddings, indices)
-        hoppy = Hoppy(model, hops_lst=[(_hops, False)], depth=1)
+        hoppy = BatchHoppy(model, hops_lst=[(_hops, False)], depth=1)
 
         for s in entity_lst:
             for p in predicate_lst:
@@ -151,10 +160,22 @@ def test_clutrr_v2():
                         arg1_emb, arg2_emb = encode_arguments(facts=triples, entity_embeddings=entity_embeddings,
                                                               entity_to_idx=entity_to_index)
 
+                        batch_size = xp.shape[0]
+                        fact_size = rel_emb.shape[0]
+                        entity_size = entity_embeddings.weight.shape[0]
+
+                        rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+                        arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+                        arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+                        nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
+                        emb = entity_embeddings.weight.view(1, entity_size, -1).repeat(batch_size, 1, 1)
+                        _nb_entities = torch.tensor([entity_size for _ in range(batch_size)], dtype=torch.long)
+
                         facts = [rel_emb, arg1_emb, arg2_emb]
 
-                        inf = hoppy.score(xp_emb, xs_emb, xo_emb, facts=facts,
-                                          entity_embeddings=entity_embeddings.weight)
+                        inf = hoppy.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                          entity_embeddings=emb, nb_entities=_nb_entities)
                         inf_np = inf.cpu().numpy()
 
                         print(s, p, o, inf_np)
@@ -190,8 +211,8 @@ def test_clutrr_v3():
     # _hops = LinearReformulator(2, embedding_size)
     _hops = AttentiveReformulator(2, predicate_embeddings)
 
-    model = NeuralKB(kernel=kernel, scoring_type='concat')
-    hoppy = Hoppy(model, hops_lst=[(_hops, False)], depth=1)
+    model = BatchNeuralKB(kernel=kernel, scoring_type='concat')
+    hoppy = BatchHoppy(model, hops_lst=[(_hops, False)], depth=1)
 
     params = [p for p in hoppy.parameters()
               if not torch.equal(p, entity_embeddings.weight)
@@ -244,9 +265,22 @@ def test_clutrr_v3():
         arg1_emb, arg2_emb = encode_arguments(facts=triples, entity_embeddings=entity_embeddings,
                                               entity_to_idx=entity_to_index)
 
+        batch_size = xp_emb.shape[0]
+        fact_size = rel_emb.shape[0]
+        entity_size = entity_embeddings.weight.shape[0]
+
+        rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
+        emb = entity_embeddings.weight.view(1, entity_size, -1).repeat(batch_size, 1, 1)
+        _nb_entities = torch.tensor([entity_size for _ in range(batch_size)], dtype=torch.long)
+
         facts = [rel_emb, arg1_emb, arg2_emb]
 
-        scores = hoppy.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        scores = hoppy.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                             entity_embeddings=emb, nb_entities=_nb_entities)
 
         labels_np = np.zeros(xs_np.shape[0])
         labels_np[:nb_positives] = 1
@@ -278,7 +312,7 @@ def test_clutrr_v4():
 
     rs = np.random.RandomState(0)
 
-    for _ in range(32):
+    for _ in range(4):
         with torch.no_grad():
             triples = [
                 ('a', 'p', 'b'),
@@ -311,13 +345,25 @@ def test_clutrr_v4():
             arg1_emb, arg2_emb = encode_arguments(facts=triples, entity_embeddings=entity_embeddings,
                                                   entity_to_idx=entity_to_index)
 
+            batch_size = 16
+            fact_size = rel_emb.shape[0]
+            entity_size = entity_embeddings.weight.shape[0]
+
+            rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+            arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+            arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+            nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
+            emb = entity_embeddings.weight.view(1, entity_size, -1).repeat(batch_size, 1, 1)
+            _nb_entities = torch.tensor([entity_size for _ in range(batch_size)], dtype=torch.long)
+
             facts = [rel_emb, arg1_emb, arg2_emb]
 
-            model = NeuralKB(kernel=kernel)
+            model = BatchNeuralKB(kernel=kernel)
 
-            xs_np = rs.randint(nb_entities, size=32)
-            xp_np = rs.randint(nb_predicates, size=32)
-            xo_np = rs.randint(nb_entities, size=32)
+            xs_np = rs.randint(nb_entities, size=batch_size)
+            xp_np = rs.randint(nb_predicates, size=batch_size)
+            xo_np = rs.randint(nb_entities, size=batch_size)
 
             xs_np[0] = 0
             xp_np[0] = 0
@@ -337,8 +383,10 @@ def test_clutrr_v4():
 
             print('xp_emb', xp_emb.shape)
 
-            scores_sp, scores_po = model.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
-            inf = model.score(xp_emb, xs_emb, xo_emb, facts=facts)
+            scores_sp, scores_po = model.forward(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                                 entity_embeddings=emb, nb_entities=_nb_entities)
+
+            inf = model.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts)
 
             assert inf[0] > 0.9
             assert inf[1] > 0.9
@@ -355,7 +403,7 @@ def test_clutrr_v4():
 def test_clutrr_v5():
     torch.set_num_threads(multiprocessing.cpu_count())
 
-    embedding_size = 50
+    embedding_size = 20
 
     torch.manual_seed(0)
     rs = np.random.RandomState(0)
@@ -409,22 +457,34 @@ def test_clutrr_v5():
                                               entity_embeddings=entity_embeddings,
                                               entity_to_idx=entity_to_index)
 
+        batch_size = 12
+        fact_size = rel_emb.shape[0]
+        entity_size = entity_embeddings.weight.shape[0]
+
+        rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
+        emb = entity_embeddings.weight.view(1, entity_size, -1).repeat(batch_size, 1, 1)
+        _nb_entities = torch.tensor([entity_size for _ in range(batch_size)], dtype=torch.long)
+
         facts = [rel_emb, arg1_emb, arg2_emb]
 
-        model = NeuralKB(kernel=kernel)
+        model = BatchNeuralKB(kernel=kernel)
 
         indices = torch.from_numpy(np.array([predicate_to_index['p'], predicate_to_index['q']]))
         reformulator = SymbolicReformulator(predicate_embeddings, indices)
 
-        hoppy0 = Hoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=0)
-        hoppy1 = Hoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=1)
-        hoppy2 = Hoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=2)
-        hoppy3 = Hoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=3)
-        hoppy4 = Hoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=4)
+        hoppy0 = BatchHoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=0)
+        hoppy1 = BatchHoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=1)
+        hoppy2 = BatchHoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=2)
+        hoppy3 = BatchHoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=3)
+        hoppy4 = BatchHoppy(model, hops_lst=[(reformulator, False), (reformulator, False)], depth=4)
 
-        xs_np = rs.randint(nb_entities, size=12)
-        xp_np = rs.randint(nb_predicates, size=12)
-        xo_np = rs.randint(nb_entities, size=12)
+        xs_np = rs.randint(nb_entities, size=batch_size)
+        xp_np = rs.randint(nb_predicates, size=batch_size)
+        xo_np = rs.randint(nb_entities, size=batch_size)
 
         xs_np[0] = entity_to_index['a']
         xp_np[0] = predicate_to_index['r']
@@ -475,19 +535,24 @@ def test_clutrr_v5():
         xo_emb = entity_embeddings(xo)
 
         # scores0 = hoppy0.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf0 = hoppy0.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf0 = hoppy0.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
 
         # scores1 = hoppy1.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf1 = hoppy1.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf1 = hoppy1.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
 
         # scores2 = hoppy2.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf2 = hoppy2.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf2 = hoppy2.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
 
         # scores3 = hoppy3.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf3 = hoppy3.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf3 = hoppy3.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
 
         # scores4 = hoppy4.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf4 = hoppy4.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf4 = hoppy4.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
 
         print(inf0)
         print(inf1)
@@ -512,7 +577,7 @@ def test_clutrr_v5():
 def test_clutrr_v6():
     torch.set_num_threads(multiprocessing.cpu_count())
 
-    embedding_size = 50
+    embedding_size = 20
 
     torch.manual_seed(0)
     rs = np.random.RandomState(0)
@@ -567,24 +632,36 @@ def test_clutrr_v6():
                                                   entity_embeddings=entity_embeddings,
                                                   entity_to_idx=entity_to_index)
 
+            batch_size = 12
+            fact_size = rel_emb.shape[0]
+            entity_size = entity_embeddings.weight.shape[0]
+
+            rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+            arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+            arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+            nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
+            emb = entity_embeddings.weight.view(1, entity_size, -1).repeat(batch_size, 1, 1)
+            _nb_entities = torch.tensor([entity_size for _ in range(batch_size)], dtype=torch.long)
+
             facts = [rel_emb, arg1_emb, arg2_emb]
 
             k = 5
 
-            model = NeuralKB(kernel=kernel)
+            model = BatchNeuralKB(kernel=kernel)
 
             indices = torch.from_numpy(np.array([predicate_to_index['p'], predicate_to_index['q']]))
             reformulator = SymbolicReformulator(predicate_embeddings, indices)
 
-            hoppy0 = Hoppy(model, hops_lst=[(reformulator, False)], depth=0)
-            hoppy1 = Hoppy(model, hops_lst=[(reformulator, False)], depth=1)
-            hoppy2 = Hoppy(model, hops_lst=[(reformulator, False)], depth=2)
-            hoppy3 = Hoppy(model, hops_lst=[(reformulator, False)], depth=3)
-            hoppy4 = Hoppy(model, hops_lst=[(reformulator, False)], depth=4)
+            hoppy0 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=0)
+            hoppy1 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=1)
+            hoppy2 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=2)
+            hoppy3 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=3)
+            hoppy4 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=4)
 
-            xs_np = rs.randint(nb_entities, size=12)
-            xp_np = rs.randint(nb_predicates, size=12)
-            xo_np = rs.randint(nb_entities, size=12)
+            xs_np = rs.randint(nb_entities, size=batch_size)
+            xp_np = rs.randint(nb_predicates, size=batch_size)
+            xo_np = rs.randint(nb_entities, size=batch_size)
 
             xs_np[0] = entity_to_index['a']
             xp_np[0] = predicate_to_index['r']
@@ -631,27 +708,32 @@ def test_clutrr_v6():
             xo_emb = entity_embeddings(xo)
 
             # res0 = hoppy0.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-            inf0 = hoppy0.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+            inf0 = hoppy0.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                entity_embeddings=emb, nb_entities=_nb_entities)
 
             # (scores0_sp, subs0_sp), (scores0_po, subs0_po) = res0
 
             # res1 = hoppy1.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-            inf1 = hoppy1.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+            inf1 = hoppy1.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                entity_embeddings=emb, nb_entities=_nb_entities)
 
             # (scores1_sp, subs1_sp), (scores1_po, subs1_po) = res1
 
             # res2 = hoppy2.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-            inf2 = hoppy2.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+            inf2 = hoppy2.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                entity_embeddings=emb, nb_entities=_nb_entities)
 
             # (scores2_sp, subs2_sp), (scores2_po, subs2_po) = res2
 
             # res3 = hoppy3.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-            inf3 = hoppy3.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+            inf3 = hoppy3.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                entity_embeddings=emb, nb_entities=_nb_entities)
 
             # (scores3_sp, subs3_sp), (scores3_po, subs3_po) = res3
 
             # scores4 = hoppy4.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-            inf4 = hoppy4.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+            inf4 = hoppy4.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                                entity_embeddings=emb, nb_entities=_nb_entities)
 
             print(inf0)
             print(inf1)
@@ -676,7 +758,7 @@ def test_clutrr_v6():
 def test_clutrr_v7():
     torch.set_num_threads(multiprocessing.cpu_count())
 
-    embedding_size = 50
+    embedding_size = 20
 
     torch.manual_seed(0)
     rs = np.random.RandomState(0)
@@ -730,24 +812,36 @@ def test_clutrr_v7():
                                               entity_embeddings=entity_embeddings,
                                               entity_to_idx=entity_to_index)
 
+        batch_size = 12
+        fact_size = rel_emb.shape[0]
+        entity_size = entity_embeddings.weight.shape[0]
+
+        rel_emb = rel_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        arg1_emb = arg1_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        arg2_emb = arg2_emb.view(1, fact_size, -1).repeat(batch_size, 1, 1)
+        nb_facts = torch.tensor([fact_size for _ in range(batch_size)], dtype=torch.long)
+
+        emb = entity_embeddings.weight.view(1, entity_size, -1).repeat(batch_size, 1, 1)
+        _nb_entities = torch.tensor([entity_size for _ in range(batch_size)], dtype=torch.long)
+
         facts = [rel_emb, arg1_emb, arg2_emb]
 
         k = 5
 
-        model = NeuralKB(kernel=kernel)
+        model = BatchNeuralKB(kernel=kernel)
 
         indices = torch.from_numpy(np.array([predicate_to_index['p'], predicate_to_index['q']]))
         reformulator = SymbolicReformulator(predicate_embeddings, indices)
 
-        hoppy0 = Hoppy(model, hops_lst=[(reformulator, False)], depth=0)
-        hoppy1 = Hoppy(model, hops_lst=[(reformulator, False)], depth=1)
-        hoppy2 = Hoppy(model, hops_lst=[(reformulator, False)], depth=2)
-        hoppy3 = Hoppy(model, hops_lst=[(reformulator, False)], depth=3)
-        hoppy4 = Hoppy(model, hops_lst=[(reformulator, False)], depth=4)
+        hoppy0 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=0)
+        hoppy1 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=1)
+        hoppy2 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=2)
+        hoppy3 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=3)
+        hoppy4 = BatchHoppy(model, hops_lst=[(reformulator, False)], depth=4)
 
-        xs_np = rs.randint(nb_entities, size=12)
-        xp_np = rs.randint(nb_predicates, size=12)
-        xo_np = rs.randint(nb_entities, size=12)
+        xs_np = rs.randint(nb_entities, size=batch_size)
+        xp_np = rs.randint(nb_predicates, size=batch_size)
+        xo_np = rs.randint(nb_entities, size=batch_size)
 
         xs_np[0] = entity_to_index['a']
         xp_np[0] = predicate_to_index['r']
@@ -794,23 +888,28 @@ def test_clutrr_v7():
         xo_emb = entity_embeddings(xo)
 
         # res0 = hoppy0.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf0 = hoppy0.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf0 = hoppy0.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
         # (scores0_sp, subs0_sp), (scores0_po, subs0_po) = res0
 
         # res1 = hoppy1.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf1 = hoppy1.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf1 = hoppy1.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
         # (scores1_sp, subs1_sp), (scores1_po, subs1_po) = res1
 
         # res2 = hoppy2.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf2 = hoppy2.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf2 = hoppy2.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
         # (scores2_sp, subs2_sp), (scores2_po, subs2_po) = res2
 
         # res3 = hoppy3.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf3 = hoppy3.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf3 = hoppy3.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
         # (scores3_sp, subs3_sp), (scores3_po, subs3_po) = res3
 
         # res4 = hoppy4.forward(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings)
-        inf4 = hoppy4.score(xp_emb, xs_emb, xo_emb, facts=facts, entity_embeddings=entity_embeddings.weight)
+        inf4 = hoppy4.score(xp_emb, xs_emb, xo_emb, facts=facts, nb_facts=nb_facts,
+                            entity_embeddings=emb, nb_entities=_nb_entities)
         # (scores4_sp, subs4_sp), (scores4_po, subs4_po) = res4
 
         inf0_np = inf0.cpu().numpy()
@@ -835,4 +934,4 @@ def test_clutrr_v7():
 
 if __name__ == '__main__':
     pytest.main([__file__])
-    # test_clutrr_v2()
+    # test_clutrr_v5()

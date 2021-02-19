@@ -1,4 +1,4 @@
-faiss
+faiss-cpu
 allennlp
 nltk
 parsimonious

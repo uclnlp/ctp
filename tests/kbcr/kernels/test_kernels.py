@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from kbcr.kernels import GaussianKernel
+from ctp.kernels import GaussianKernel
 
 import pytest
 

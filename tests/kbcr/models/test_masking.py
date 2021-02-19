@@ -5,10 +5,10 @@ import numpy as np
 import torch
 from torch import nn
 
-from kbcr.kernels import GaussianKernel
-from kbcr.models import NeuralKB
-from kbcr.models.reasoning import SimpleHoppy
-from kbcr.reformulators import SymbolicReformulator
+from ctp.kernels import GaussianKernel
+from ctp.models import NeuralKB
+from ctp.models.reasoning import SimpleHoppy
+from ctp.reformulators import SymbolicReformulator
 
 import pytest
 
@@ -91,8 +91,8 @@ def test_masking_v1():
                     scores_po = scores_po.cpu().numpy()
 
                     for i in range(xs.shape[0]):
-                        np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                        np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                        np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-2, atol=1e-2)
+                        np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-2, atol=1e-2)
 
 
 @pytest.mark.light
@@ -176,8 +176,8 @@ def test_masking_v2():
                     scores_po = scores_po.cpu().numpy()
 
                     for i in range(xs.shape[0]):
-                        np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-5, atol=1e-5)
-                        np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-5, atol=1e-5)
+                        np.testing.assert_allclose(inf[i], scores_sp[i, xo[i]], rtol=1e-2, atol=1e-2)
+                        np.testing.assert_allclose(inf[i], scores_po[i, xs[i]], rtol=1e-2, atol=1e-2)
 
 
 if __name__ == '__main__':
