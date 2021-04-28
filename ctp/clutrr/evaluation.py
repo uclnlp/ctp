@@ -16,7 +16,8 @@ def accuracy(scoring_function: Callable[[List[Instance], List[str]], Tuple[Tenso
              relation_lst: List[str],
              sample_size: Optional[int] = None,
              batch_size: Optional[int] = None,
-             relation_to_predicate: Optional[Dict[str, str]] = None) -> float:
+             relation_to_predicate: Optional[Dict[str, str]] = None,
+             is_debug: bool = False) -> float:
 
     if sample_size is not None:
         instances = instances[:sample_size]
@@ -51,10 +52,10 @@ def accuracy(scoring_function: Callable[[List[Instance], List[str]], Tuple[Tenso
 
         for i, (a, b) in enumerate(zip(predicted.tolist(), true.tolist())):
             if a != b:
-                # print(batch[i])
-                # rel_score_pairs = [(relation_lst[j], scores_np[i, j]) for j in range(len(relation_lst))]
-                # print(rel_score_pairs)
-                pass
+                if is_debug is True:
+                    print(batch[i])
+                    rel_score_pairs = [(relation_lst[j], scores_np[i, j]) for j in range(len(relation_lst))]
+                    print(rel_score_pairs)
 
         is_correct_lst += (predicted == true).tolist()
 

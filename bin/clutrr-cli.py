@@ -464,7 +464,8 @@ def main(argv):
                            sample_size=sample_size,
                            relation_lst=test_predicate_lst if is_predicate else test_relation_lst,
                            batch_size=test_batch_size,
-                           relation_to_predicate=relation_to_predicate if is_predicate else None)
+                           relation_to_predicate=relation_to_predicate if is_predicate else None,
+                           debug=is_debug)
             logger.info(f'Test Accuracy on {path}: {res:.6f}')
         return res
 
