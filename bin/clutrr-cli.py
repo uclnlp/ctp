@@ -539,9 +539,6 @@ def main(argv):
 
             loss = loss_function(scores, labels)
 
-            if nb_gradient_accumulation_steps > 1:
-                loss = loss / nb_gradient_accumulation_steps
-
             factors = [hoppy.factor(e) for e in query_emb_lst]
 
             loss += N2_weight * N2_reg(factors) if N2_weight is not None else 0.0
@@ -554,6 +551,9 @@ def main(argv):
                     loss += entropy_weight * entropy_reg([attention])
 
             loss_value = loss.item()
+
+            if nb_gradient_accumulation_steps > 1:
+                loss = loss / nb_gradient_accumulation_steps
 
             epoch_loss_values += [loss_value]
 
