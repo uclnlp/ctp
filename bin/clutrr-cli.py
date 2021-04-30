@@ -551,11 +551,10 @@ def main(argv):
                     loss += entropy_weight * entropy_reg([attention])
 
             loss_value = loss.item()
+            epoch_loss_values += [loss_value]
 
             if nb_gradient_accumulation_steps > 1:
                 loss = loss / nb_gradient_accumulation_steps
-
-            epoch_loss_values += [loss_value]
 
             loss.backward()
 
