@@ -10,7 +10,7 @@ import pytest
 
 
 @pytest.mark.light
-def test_complex_cli_v1():
+def disabled_test_complex_cli_v1():
     env = os.environ.copy()
     env['PYTHONPATH'] = '.'
 
