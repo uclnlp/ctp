@@ -1,5 +1,5 @@
 faiss-cpu
-allennlp
+allennlp==0.9
 nltk
 parsimonious
 numpy

@@ -191,6 +191,8 @@ def main(argv):
                            choices=['static', 'linear', 'attentive', 'memory', 'ntp'])
     argparser.add_argument('--nb-rules', '-R', action='store', type=int, default=4)
 
+    argparser.add_argument('--gradient-accumulation-steps', action='store', type=int, default=1)
+
     argparser.add_argument('--GNTP-R', action='store', type=int, default=None)
 
     argparser.add_argument('--slope', '-S', action='store', type=float, default=None)
@@ -243,6 +245,8 @@ def main(argv):
     tnorm_name = args.tnorm
     reformulator_name = args.reformulator
     nb_rules = args.nb_rules
+
+    nb_gradient_accumulation_steps = args.gradient_accumulation_steps
 
     gntp_R = args.GNTP_R
 
@@ -535,6 +539,9 @@ def main(argv):
 
             loss = loss_function(scores, labels)
 
+            if nb_gradient_accumulation_steps > 1:
+                loss = loss / nb_gradient_accumulation_steps
+
             factors = [hoppy.factor(e) for e in query_emb_lst]
 
             loss += N2_weight * N2_reg(factors) if N2_weight is not None else 0.0
@@ -552,8 +559,9 @@ def main(argv):
 
             loss.backward()
 
-            optimizer.step()
-            optimizer.zero_grad()
+            if nb_gradient_accumulation_steps == 1 or global_step % nb_gradient_accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
 
             logger.info(f'Epoch {epoch_no}/{nb_epochs}\tBatch {batch_no}/{nb_batches}\tLoss {loss_value:.4f}')
 
